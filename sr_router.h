@@ -86,11 +86,11 @@ void handle_arp_reply(struct sr_instance* sr,
                         sr_arp_hdr_t* packet_arp_reply_header, 
                         struct sr_if *receiving_interface);
 
-void send_all_waiting_packet_out(struct sr_instance* sr, 
-                                 sr_arp_hdr_t* packet_arp_reply_header,
-                                 uint8_t *waiting_packet_raw_eth_frame,
-                                 struct sr_if *receiving_interface, 
-                                 unsigned int waiting_packet_raw_eth_frame_len);
+send_packet_out_to_next_hop(struct sr_instance* sr, 
+                            uint8_t *destination_mac_addr,
+                            uint8_t *packet_raw_eth_frame,
+                            struct sr_if *outgoing_interface, 
+                            unsigned int packet_raw_eth_frame_len);
 
 /* send the arp reply back if incoming_packet_dest_ip == interface_ip.*/
 void handle_arp_packet_request(struct sr_instance* sr, 

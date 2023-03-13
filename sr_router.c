@@ -173,7 +173,9 @@ void handle_arp_reply(struct sr_instance* sr,
     while(req_waiting_packet != NULL) {
         uint8_t *waiting_packet_raw_eth_frame = req_waiting_packet->buf;
         unsigned int waiting_packet_raw_eth_frame_len = req_waiting_packet->len;
-        send_all_waiting_packet_out(sr, packet_arp_reply_header, 
+        uint8_t *destination_mac_addr = packet_arp_reply_header->ar_sha;
+        send_packet_out_to_next_hop(sr, 
+                                    destination_mac_addr, 
                                     waiting_packet_raw_eth_frame, 
                                     receiving_interface, 
                                     waiting_packet_raw_eth_frame_len);
@@ -183,17 +185,18 @@ void handle_arp_reply(struct sr_instance* sr,
     sr_arpreq_destroy(&sr->cache, arp_request);
 }
 
-void send_all_waiting_packet_out(struct sr_instance* sr, 
-                                 sr_arp_hdr_t* packet_arp_reply_header,
-                                 uint8_t *waiting_packet_raw_eth_frame,
-                                 struct sr_if *receiving_interface, 
-                                 unsigned int waiting_packet_raw_eth_frame_len) {
+void send_packet_out_to_next_hop(struct sr_instance* sr, 
+                                 uint8_t *destination_mac_addr,
+                                 uint8_t *packet_raw_eth_frame,
+                                 struct sr_if *outgoing_interface, 
+                                 unsigned int packet_raw_eth_frame_len) {
 
-    sr_ethernet_hdr_t *waiting_packet_ethernet_header = extract_eth_header(waiting_packet_raw_eth_frame, 0);
-    build_waiting_packet_eth_header(packet_arp_reply_header, 
-                                    waiting_packet_ethernet_header,
-                                    receiving_interface);
-    sr_send_packet(sr, waiting_packet_raw_eth_frame, waiting_packet_raw_eth_frame_len, receiving_interface->name);
+    sr_ethernet_hdr_t *packet_ethernet_header = extract_eth_header(packet_raw_eth_frame, 0);
+    unsigned char *src_mac_addr = outgoing_interface->addr;
+    build_packet_eth_header(src_mac_addr, 
+                            destination_mac_addr,
+                            packet_ethernet_header);
+    sr_send_packet(sr, packet_raw_eth_frame, packet_raw_eth_frame_len, outgoing_interface->name);
 }
 
 
@@ -373,10 +376,18 @@ void handle_ip_packet(struct sr_instance* sr,
             return;
         }
         fprintf(stderr, "ttl > 0\n");
-        /* Find an entry in the routing table that exactly matches the destination IP address*/
-        /*struct sr_rt *next_hop = NULL;*/
-        struct sr_rt *next_hop = find_entry_in_routing_table(sr, packet_ip_header->ip_dst);
-        fprintf(stderr, "is next_hop NULL?: %d\n", next_hop==NULL);
+                
+        /*
+            Find out which entry in the routing table has the longest prefix match 
+            with the destination or gateway IP address.
+        */
+        /*
+            Destination is the ip of a network or a host 
+            (if it's a host, mask must be 0xffffffff; if it's a network then mask is less than that). 
+            Gateway is the ip of the next-hop device on the path to that destination. 
+            These 2 would be the same if the packet is only one-hop away from the destination.
+        */
+        struct sr_rt *next_hop = find_longest_prefix_match_in_routing_table(sr, packet_ip_header->ip_dst);
         /*
             If no matching entry is in the routing table, send an
             ICMP destination net unreachable message(type 3, code 0) back to the sending host.
@@ -390,15 +401,45 @@ void handle_ip_packet(struct sr_instance* sr,
         }
 
         /*
-            If an entry exists, send an ARP request for the next-hop IP.
+            (1.) If an entry exists, check the ARP cache for the next-hop MAC address
+            corresponding to the next-hop IP. If it's there, send it
+                (1.1) If the ARP cache does not have a MAC address entry for the
+                next-hop IP, send an ARP request for the next-hop IP (if one hasn't
+                been sent within the last second), and add the packet to the queue
+                of packets waiting on this ARP request.
         */
-        struct sr_arpreq *arp_request = sr_arpcache_queuereq(&sr->cache, 
-                                                             packet_ip_header->ip_dst, 
-                                                             packet, 
-                                                             len, 
-                                                             next_hop->interface);
-        fprintf(stderr, "entry exists, send an ARP request for the next-hop IP\n");
-        handle_arp_request(sr, arp_request);
+        /*
+             
+            # When sending packet to next_hop_ip
+            entry = arpcache_lookup(next_hop_ip)
+
+            if entry:
+                use next_hop_ip->mac mapping in entry to send the packet
+                free entry
+            else:
+                req = arpcache_queuereq(next_hop_ip, packet, len)
+                handle_arpreq(req)
+        
+        */
+        struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache, next_hop->gw.s_addr);
+        if(NULL != arp_entry) {
+            uint8_t *destination_mac_addr = arp_entry->mac;
+            struct sr_if *outgoing_interface = sr_get_interface(sr, next_hop->interface);
+            send_packet_out_to_next_hop(sr, 
+                                        destination_mac_addr,
+                                        packet,
+                                        outgoing_interface, 
+                                        len);
+            free(arp_entry);
+        }else {
+            struct sr_arpreq *arp_request = sr_arpcache_queuereq(&sr->cache, 
+                                                                 packet_ip_header->ip_dst, 
+                                                                 packet, 
+                                                                 len, 
+                                                                 next_hop->interface);
+            fprintf(stderr, "entry exists, send an ARP request for the next-hop IP\n");
+            handle_arp_request(sr, arp_request);
+        }
         return;
     }
 

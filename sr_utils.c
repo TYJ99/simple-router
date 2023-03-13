@@ -480,36 +480,64 @@ struct sr_rt * find_entry_in_routing_table(struct sr_instance* sr,
     return next_hop;
 }
 
-void build_waiting_packet_eth_header(sr_arp_hdr_t* packet_arp_reply_header, 
-                                     sr_ethernet_hdr_t *waiting_packet_ethernet_header,
-                                     struct sr_if *receiving_interface) {
+struct sr_rt * find_longest_prefix_match_in_routing_table(struct sr_instance* sr, 
+                                                          uint32_t packet_ip_addr) {
+    struct sr_rt *next_hop = NULL;
+    /*uint32_t packet_ip_addr = packet_ip_header->ip_dst;*/
+    struct sr_rt *curr_routing_table_entry = sr->routing_table;
+    uint32_t longest_prefix = 0;
+    fprintf(stderr, "in find_longest_prefix_match_in_routing_table\n");
+    fprintf(stderr, "packet_ip_addr: ");   
+    print_addr_ip_int(packet_ip_addr); 
+    while(NULL != curr_routing_table_entry) {
+        fprintf(stderr, "curr_routing_table_entry->dest: ");   
+        print_addr_ip_int(curr_routing_table_entry->dest.s_addr); 
+        uint32_t packet_ip_addr_with_mask = packet_ip_addr & curr_routing_table_entry->mask.s_addr;
+        uint32_t curr_routing_table_entry_gw_with_mask = curr_routing_table_entry->dest.s_addr & curr_routing_table_entry->mask.s_addr;
 
-    unsigned char *src_mac_addr = receiving_interface->addr;
-    uint8_t *destination_mac_addr = packet_arp_reply_header->ar_sha;
+        if(packet_ip_addr_with_mask == curr_routing_table_entry_gw_with_mask && 
+           longest_prefix < curr_routing_table_entry->mask.s_addr) {
+
+              fprintf(stderr, "longest prefix matched!\n");
+              longest_prefix = curr_routing_table_entry->mask.s_addr;
+              next_hop = curr_routing_table_entry;
+              break;
+        }
+        curr_routing_table_entry = curr_routing_table_entry->next;
+    }    
+    return next_hop;
+}
+
+void build_packet_eth_header(unsigned char *src_mac_addr, 
+                             uint8_t *destination_mac_addr,
+                             sr_ethernet_hdr_t *packet_ethernet_header) {
+
+    /*unsigned char *src_mac_addr = connected_interface->addr;*/
+    /*uint8_t *destination_mac_addr = packet_arp_reply_header->ar_sha;*/
     /* IP packet waiting for ARP reply forward to next hop.*/
-    memcpy(waiting_packet_ethernet_header->ether_dhost, destination_mac_addr, ETHER_ADDR_LEN);
-    memcpy(waiting_packet_ethernet_header->ether_shost, src_mac_addr, ETHER_ADDR_LEN);
+    memcpy(packet_ethernet_header->ether_dhost, destination_mac_addr, ETHER_ADDR_LEN);
+    memcpy(packet_ethernet_header->ether_shost, src_mac_addr, ETHER_ADDR_LEN);
 }
 
 void build_new_arp_reply_packet_arp_header(sr_arp_hdr_t* new_arp_packet_arp_header, 
                                            sr_arp_hdr_t* original_packet_arp_header,
-                                           struct sr_if *receiving_interface) { 
+                                           struct sr_if *connected_interface) { 
                                            
     new_arp_packet_arp_header->ar_hrd = original_packet_arp_header->ar_hrd;                        /* format of hardware address   */
     new_arp_packet_arp_header->ar_pro = original_packet_arp_header->ar_pro;                        /* format of protocol address   */
     new_arp_packet_arp_header->ar_hln = original_packet_arp_header->ar_hln;                        /* length of hardware address   */
     new_arp_packet_arp_header->ar_pln = original_packet_arp_header->ar_pln;                        /* length of protocol address   */
     new_arp_packet_arp_header->ar_op = htons(arp_op_reply);                                        /* ARP opcode (command)         */
-    memcpy(new_arp_packet_arp_header->ar_sha, receiving_interface->addr, ETHER_ADDR_LEN);          /* sender hardware address      */
-    new_arp_packet_arp_header->ar_sip = receiving_interface->ip;                                   /* sender IP address            */
+    memcpy(new_arp_packet_arp_header->ar_sha, connected_interface->addr, ETHER_ADDR_LEN);          /* sender hardware address      */
+    new_arp_packet_arp_header->ar_sip = connected_interface->ip;                                   /* sender IP address            */
     memcpy(new_arp_packet_arp_header->ar_tha, original_packet_arp_header->ar_sha, ETHER_ADDR_LEN); /* target hardware address      */
     new_arp_packet_arp_header->ar_tip = original_packet_arp_header->ar_sip;                        /* target IP address            */
 }
 
 void build_new_arp_reply_packet_eth_header(sr_ethernet_hdr_t* new_arp_packet_eth_header, 
                                            sr_ethernet_hdr_t* original_packet_eth_header,
-                                           struct sr_if *receiving_interface) {
-    unsigned char *src_mac_addr = receiving_interface->addr;
+                                           struct sr_if *connected_interface) {
+    unsigned char *src_mac_addr = connected_interface->addr;
     
     /* ARP reply is sent back to the sender.*/
     memcpy(new_arp_packet_eth_header->ether_dhost, original_packet_eth_header->ether_shost, ETHER_ADDR_LEN);

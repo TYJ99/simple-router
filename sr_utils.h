@@ -116,18 +116,19 @@ sr_icmp_t11_hdr_t* extract_icmp_header(uint8_t *packet, unsigned long long offse
 struct sr_rt * find_entry_in_routing_table(struct sr_instance *sr, 
                                            uint32_t packet_ip_addr);
                                  
-                                          
+struct sr_rt * find_longest_prefix_match_in_routing_table(struct sr_instance* sr, 
+                                                          uint32_t packet_ip_addr);                                          
 
-void build_waiting_packet_eth_header(sr_arp_hdr_t *packet_arp_reply_header, 
-                                     sr_ethernet_hdr_t *waiting_packet_ethernet_header,
-                                     struct sr_if *receiving_interface);
+void build_packet_eth_header(unsigned char *src_mac_addr, 
+                             uint8_t *destination_mac_addr,
+                             sr_ethernet_hdr_t *packet_ethernet_header);
 
 void build_new_arp_reply_packet_arp_header(sr_arp_hdr_t *new_arp_packet_arp_header, 
                                            sr_arp_hdr_t *original_packet_arp_header,
-                                           struct sr_if *receiving_interface);
+                                           struct sr_if *connected_interface);
 
 void build_new_arp_reply_packet_eth_header(sr_ethernet_hdr_t *new_arp_packet_eth_header, 
                                            sr_ethernet_hdr_t *original_packet_eth_header,
-                                           struct sr_if *receiving_interface);
+                                           struct sr_if *connected_interface);
 
 #endif /* -- SR_UTILS_H -- */
