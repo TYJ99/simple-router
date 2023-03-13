@@ -252,16 +252,20 @@ uint8_t check_arp_packet_mini_len(unsigned int total_packet_len) {
         (1.) Sanity-check the packet (meets minimum length and has correct checksum). 
             The IP checksum is calculated over just the IP header.
         (2.) Decrement the TTL by 1, and recompute the packet checksum over the modified header.
-        (3.) Find an entry in the routing table that exactly matches the destination IP address 
-            (do not perform longest-prefix matching). Instead, only forward if 
-            there is an exact match to the IP address.
-                (3.1) If an entry exists, send an ARP request for the next-hop IP.
-                    (3.1.1) If the router gets an ARP response within 5 seconds (5 tries), 
-                            send the packet out toward its destination. 
-                            Do not store the response in an ARP cache.
-                            Instead, you will have to send an ARP request for every packet.
-                (3.2) If an ARP response is not received within 5 seconds (5 tries), send an
-                      ICMP destination host unreachable message back to the source of the packet.
+        (3.) Find out which entry in the routing table has the longest prefix match with the
+             destination IP address.
+                (3.1) If an entry exists, check the ARP cache for the next-hop MAC address
+                      corresponding to the next-hop IP. If it's there, send it
+                      (3.1.1) If the ARP cache does not have a MAC address entry for the
+                              next-hop IP, send an ARP request for the next-hop IP (if one hasn't
+                              been sent within the last second), and add the packet to the queue
+                              of packets waiting on this ARP request.
+
+        This is a very simplified version of the forwarding process, and the low-level details
+        follow. For example, if an error occurs in any of the above steps, you will have to send an
+        ICMP message back to the sender notifying them of an error. You may also get an ARP
+        request or reply, which has to interact with the ARP cache correctly.
+
         (4.) If no matching entry is in the routing table or if an ARP response is not received, 
             send an ICMP destination net unreachable message back to the source of the packet.
 
@@ -324,13 +328,30 @@ void handle_ip_packet(struct sr_instance* sr,
                     length is determined by the total length field of the IP header. The router should
                     copy the complete data field from an echo request to the corresponding echo reply.
                    
-            (2.) Otherwise, ignore the packet.
+            (2.) If the packet contains a TCP or UDP payload, send an ICMP port unreachable(type 3, code 3)
+                 to the sending host. Otherwise, ignore the packet. Packets destined elsewhere
+                 should be forwarded using your normal forwarding logic.
+                 (TCP Protocol Number: 6)
+                 (UDP Protocol Number: 17)
+                 (https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml)
         */
         struct sr_if* connected_interface = sr_get_interface(sr, interface);
         if(ip_protocol_icmp == curr_protocol) {
-            fprintf(stderr, "ip_protocol_icmp == curr_protocol\n");
+            fprintf(stderr, "curr_protocol is ICMP\n");
             handle_icmp_echo_reply(sr, packet, len, connected_interface);
+        }else if(ip_protocol_tcp == curr_protocol || ip_protocol_udp == curr_protocol) {
+            fprintf(stderr, "curr_protocol is TCP or UDP\n");
+            uint8_t icmp_type = 3, icmp_code = 3;
+            /*
+                send an ICMP port unreachable(type 3, code 3) to the sending host.
+            */
+            send_icmp_with_type_code(sr, 
+                                     packet,
+                                     connected_interface,
+                                     icmp_type, 
+                                     icmp_code)
         }
+        
         return;
     }
 
