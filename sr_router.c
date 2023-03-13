@@ -307,15 +307,14 @@ void handle_ip_packet(struct sr_instance* sr,
     /* of our router interfaces*/
     /*struct sr_if *destined_interface = NULL;*/
     struct sr_if *destined_interface = check_if_ip_packet_destination_is_current_router(sr, packet_ip_header);
-    fprintf(stderr, "is destined_interface NULL?: %d\n", NULL == destined_interface);
+    fprintf(stderr, "is destined_interface NULL?: %d\n", NULL == destined_interface);    
+    /* The IP packet is sent to one of my router's IP addresses*/
     if(NULL != destined_interface) {
         fprintf(stderr, "destined_interface ip: ");
         print_addr_ip_int(destined_interface->ip);
         fprintf(stderr, "destined_interface MAC address: ");
         print_addr_eth(destined_interface->addr);
-    }
-    /* The IP packet is sent to one of my router's IP addresses*/
-    if(NULL != destined_interface) {
+
         uint8_t curr_protocol = packet_ip_header->ip_p;
         /*
             (1.) If the packet is an ICMP echo request and its checksum is valid, send an ICMP echo
@@ -355,7 +354,7 @@ void handle_ip_packet(struct sr_instance* sr,
         fprintf(stderr, "ttl > 0\n");
         /* Find an entry in the routing table that exactly matches the destination IP address*/
         /*struct sr_rt *next_hop = NULL;*/
-        struct sr_rt *next_hop = find_entry_in_routing_table(sr, packet_ip_header);
+        struct sr_rt *next_hop = find_entry_in_routing_table(sr, packet_ip_header->ip_dst);
         fprintf(stderr, "is next_hop NULL?: %d\n", next_hop==NULL);
         /*
             If no matching entry is in the routing table, send an

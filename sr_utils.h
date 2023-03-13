@@ -114,7 +114,7 @@ sr_icmp_t11_hdr_t* extract_icmp_header(uint8_t *packet, unsigned long long offse
     (do not perform longest-prefix matching)
 */
 struct sr_rt * find_entry_in_routing_table(struct sr_instance *sr, 
-                                 sr_ip_hdr_t *packet_ip_header);
+                                           uint32_t packet_ip_addr);
                                  
                                           
 

@@ -11,6 +11,7 @@
 #include "sr_if.h"
 #include "sr_protocol.h"
 #include "sr_utils.h"
+#include "sr_rt.h"
 
 /* 
   This function gets called every second. For each request sent out, we keep
@@ -67,6 +68,7 @@ void handle_arp_request(struct sr_instance *sr, struct sr_arpreq *arp_request) {
             ICMP destination host unreachable message(type 3, code 1) back to the source of the
             packet.
         */
+        fprintf(stderr, "arp_request->times_sent: %d\n", arp_request->times_sent);
         if (arp_request->times_sent >= 5) {
             /* 
                 List of pkts waiting on this req to finish
@@ -81,9 +83,13 @@ void handle_arp_request(struct sr_instance *sr, struct sr_arpreq *arp_request) {
             uint8_t icmp_type = 3, icmp_code = 1;
             /* int status = 0;*/
             while(req_waiting_packet != NULL) {
-                struct sr_if *dest_interface = sr_get_interface(sr, req_waiting_packet->iface);
-                uint8_t *dest_raw_eth_frame = req_waiting_packet->buf;
-                send_icmp_with_type_code(sr, dest_raw_eth_frame, dest_interface, icmp_type, icmp_code);
+                /*struct sr_if *dest_interface = sr_get_interface(sr, req_waiting_packet->iface);*/
+                uint8_t *original_packet_raw_eth_frame = req_waiting_packet->buf;
+                sr_ip_hdr_t* original_packet_ip_header = extract_ip_header(original_packet_raw_eth_frame, sizeof(sr_ethernet_hdr_t));
+                struct sr_rt *next_hop = find_entry_in_routing_table(sr, original_packet_ip_header->ip_src);
+                struct sr_if* connected_interface = sr_get_interface(sr, next_hop->interface);
+                fprintf(stderr, "send icmp host unreachable(type 3, code 1) to source addr(sender)\n");
+                send_icmp_with_type_code(sr, original_packet_raw_eth_frame, connected_interface, icmp_type, icmp_code);
                 req_waiting_packet = req_waiting_packet->next;
             }
             sr_arpreq_destroy(&sr->cache, arp_request);

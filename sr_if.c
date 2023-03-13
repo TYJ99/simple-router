@@ -46,10 +46,12 @@ struct sr_if* sr_get_interface(struct sr_instance* sr, const char* name)
 
     while(if_walker)
     {
-       fprintf(stderr, "sr_get_interface: \n");
-       print_addr_ip_int(if_walker->ip);
        if(!strncmp(if_walker->name,name,sr_IFACE_NAMELEN))
-        { return if_walker; }
+        {
+            fprintf(stderr, "sr_get_interface: \n");
+            print_addr_ip_int(if_walker->ip); 
+            return if_walker; 
+        }
         if_walker = if_walker->next;
     }
 

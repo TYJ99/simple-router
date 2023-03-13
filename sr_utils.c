@@ -256,6 +256,7 @@ void send_icmp_with_type_code(struct sr_instance *sr,
         send ICMP(type 11, code 0) back to the sending host.
         (do NOT find an entry in the routing table of the router)            
     */
+    /*
     struct sr_rt *next_hop = NULL;
     struct sr_if *outgoing_interface = NULL;
     fprintf(stderr, "original_packet_ip_header->ip_ttl: %d\n", original_packet_ip_header->ip_ttl);
@@ -267,6 +268,9 @@ void send_icmp_with_type_code(struct sr_instance *sr,
     }else {
         outgoing_interface = sr_get_interface(sr, next_hop->interface);
     }
+    */
+
+    struct sr_if *outgoing_interface = dest_interface;
 
     /* build new ethernet header from original packet*/
     build_new_sending_packet_eth_header(new_sending_packet_eth_header, original_packet_eth_header, outgoing_interface);
@@ -454,19 +458,19 @@ sr_icmp_t11_hdr_t* extract_icmp_header(uint8_t *packet, unsigned long long offse
     (do not perform longest-prefix matching)
 */
 struct sr_rt * find_entry_in_routing_table(struct sr_instance* sr, 
-                                 sr_ip_hdr_t* packet_ip_header) {
+                                           uint32_t packet_ip_addr) {
                                           
     struct sr_rt *next_hop = NULL;
-    uint32_t packet_ip_dest = packet_ip_header->ip_dst;
+    /*uint32_t packet_ip_addr = packet_ip_header->ip_dst;*/
     struct sr_rt *curr_routing_table_entry = sr->routing_table;
     fprintf(stderr, "in find_entry_in_routing_table\n");
-    fprintf(stderr, "packet_ip_dest_ip: ");   
-    print_addr_ip_int(packet_ip_dest); 
+    fprintf(stderr, "packet_ip_addr: ");   
+    print_addr_ip_int(packet_ip_addr); 
     while(NULL != curr_routing_table_entry) {
         fprintf(stderr, "curr_routing_table_entry->dest: ");   
         print_addr_ip_int(curr_routing_table_entry->dest.s_addr); 
-        if(packet_ip_dest == curr_routing_table_entry->dest.s_addr) {
-            fprintf(stderr, "packet_ip_dest == curr_routing_table_entry->dest.s_addr\n");
+        if(packet_ip_addr == curr_routing_table_entry->dest.s_addr) {
+            fprintf(stderr, "packet_ip_addr == curr_routing_table_entry->dest.s_addr\n");
             next_hop = curr_routing_table_entry;
             fprintf(stderr, "next_hop != NULL\n");
             break;
