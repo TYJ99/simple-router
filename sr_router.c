@@ -142,33 +142,35 @@ void handle_arp_packet(struct sr_instance* sr,
     
 }
 
-/* send all the packets on the waiting queue out. */
+/*  
+    1. cache ARP replies.
+    2. send all the packets on the waiting queue out. 
+*/
+/*
+    The ARP reply processing code should move entries from the ARP request
+    queue to the ARP cache:
+
+    # When servicing an arp reply that gives us an IP->MAC mapping
+    req = arpcache_insert(ip, mac)
+
+    if req:
+        send all packets on the req->packets linked list
+        arpreq_destroy(req)
+*/
 void handle_arp_packet_reply(struct sr_instance* sr, 
                         sr_arp_hdr_t* packet_arp_reply_header, 
                         struct sr_if *outgoing_interface) {
 
+    /*
+        cache ARP replies and get the arp_request with this ip
+    */
+    struct sr_arpreq *arp_request = sr_arpcache_insert(&sr->cache, 
+                                                       packet_arp_reply_header->ar_sha, 
+                                                       packet_arp_reply_header->ar_sip);
     /* 
        List of pkts waiting on this req to finish
        handle one packet on the waiting list at a time.
     */
-    /*
-        iterate through sr->cache.requests to find the request.
-    */
-    struct sr_arpreq *arp_request = sr->cache.requests;
-    uint32_t target_ip = packet_arp_reply_header->ar_sip;
-    struct sr_arpreq *arp_request_next = NULL;
-    while (arp_request != NULL) {
-        /*
-            Since handle_arpreq as defined in the comments above could destroy your
-            current request, make sure to save the next pointer before calling
-            handle_arpreq when traversing through the ARP requests linked list.
-        */
-        arp_request_next = arp_request->next;
-        if (arp_request->ip == target_ip) {
-            break;
-        }
-        arp_request = arp_request_next;
-    }
     struct sr_packet *req_waiting_packet = arp_request->packets;
     
     /*
@@ -439,6 +441,10 @@ void handle_ip_packet(struct sr_instance* sr,
         */
         struct sr_arpentry *arp_entry = sr_arpcache_lookup(&sr->cache, next_hop->gw.s_addr);
         if(NULL != arp_entry) {
+            /*
+                the ARP cache for the next-hop MAC address
+                corresponding to the next-hop IP is there.
+            */
             uint8_t *destination_mac_addr = arp_entry->mac;
             struct sr_if *outgoing_interface = sr_get_interface(sr, next_hop->interface);
             send_packet_out_to_next_hop(sr, 
@@ -448,6 +454,11 @@ void handle_ip_packet(struct sr_instance* sr,
                                         len);
             free(arp_entry);
         }else {
+            /*
+                Adds an ARP request to the ARP request queue. If the request is already on
+                the queue, adds the packet to the linked list of packets for this sr_arpreq
+                that corresponds to this ARP request.
+            */
             struct sr_arpreq *arp_request = sr_arpcache_queuereq(&sr->cache, 
                                                                  packet_ip_header->ip_dst, 
                                                                  packet, 
