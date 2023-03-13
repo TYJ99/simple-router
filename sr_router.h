@@ -82,9 +82,9 @@ void handle_arp_packet(struct sr_instance* sr,
                        char* interface/* lent */);
 
 /* send all the packets on the waiting queue out.*/
-void handle_arp_reply(struct sr_instance* sr, 
+void handle_arp_packet_reply(struct sr_instance* sr, 
                         sr_arp_hdr_t* packet_arp_reply_header, 
-                        struct sr_if *receiving_interface);
+                        struct sr_if *outgoing_interface);
 
 send_packet_out_to_next_hop(struct sr_instance* sr, 
                             uint8_t *destination_mac_addr,
@@ -96,12 +96,12 @@ send_packet_out_to_next_hop(struct sr_instance* sr,
 void handle_arp_packet_request(struct sr_instance* sr, 
                         sr_arp_hdr_t* packet_arp_header, 
                         uint8_t * packet, 
-                        struct sr_if *receiving_interface);
+                        struct sr_if *connected_interface);
 
 void send_arp_reply(struct sr_instance* sr, 
                     sr_arp_hdr_t* original_packet_arp_header, 
                     uint8_t * packet, 
-                    struct sr_if *receiving_interface);
+                    struct sr_if *connected_interface);
 
 /* the minimum length of a arp packet is sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t) */
 uint8_t check_arp_packet_mini_len(unsigned int total_packet_len);

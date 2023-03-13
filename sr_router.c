@@ -99,7 +99,8 @@ void sr_handlepacket(struct sr_instance* sr,
 
     If the incoming packet is arp_reply_packet, 
     send all the packets on the waiting queue out.
-
+    
+    https://baike.baidu.hk/item/ARP/609343
 */
 
 void handle_arp_packet(struct sr_instance* sr,
@@ -116,31 +117,35 @@ void handle_arp_packet(struct sr_instance* sr,
         return;
     }
     
-    /* 
-        check if the arp target ip address match this interface ip address
-        if not, ignore this ARP packet.
-    */
-    struct sr_if *receiving_interface = sr_get_interface(sr, interface);
-    if(receiving_interface->ip != packet_arp_header->ar_tip) {
-        fprintf(stderr, "the arp target ip address does NOT match this interface ip address\n");
-        return;
-    }
-
+    struct sr_if *connected_interface = sr_get_interface(sr, interface);
     unsigned short arp_op = ntohs(packet_arp_header->ar_op);
     if(arp_op_request == arp_op) {
+        /*
+            When handling ARP requests, you should only send an ARP reply
+            if the target IP address is one of your router's IP addresses.
+        */
+
+        /* 
+            check if the arp target ip address match this interface ip address
+            if not, ignore this ARP packet.
+        */
+        if(connected_interface->ip != packet_arp_header->ar_tip) {
+            fprintf(stderr, "the arp target ip address does NOT match this interface ip address\n");
+            return;
+        }
         fprintf(stderr, "handle_arp_packet_request\n");
-        handle_arp_packet_request(sr, packet_arp_header, packet, receiving_interface);
+        handle_arp_packet_request(sr, packet_arp_header, packet, connected_interface);
     }else if(arp_op_reply == arp_op) {
-        fprintf(stderr, "handle_arp_reply\n");
-        handle_arp_reply(sr, packet_arp_header, receiving_interface);
+        fprintf(stderr, "handle_arp_packet_reply\n");
+        handle_arp_packet_reply(sr, packet_arp_header, connected_interface);
     }
     
 }
 
 /* send all the packets on the waiting queue out. */
-void handle_arp_reply(struct sr_instance* sr, 
+void handle_arp_packet_reply(struct sr_instance* sr, 
                         sr_arp_hdr_t* packet_arp_reply_header, 
-                        struct sr_if *receiving_interface) {
+                        struct sr_if *outgoing_interface) {
 
     /* 
        List of pkts waiting on this req to finish
@@ -177,7 +182,7 @@ void handle_arp_reply(struct sr_instance* sr,
         send_packet_out_to_next_hop(sr, 
                                     destination_mac_addr, 
                                     waiting_packet_raw_eth_frame, 
-                                    receiving_interface, 
+                                    outgoing_interface, 
                                     waiting_packet_raw_eth_frame_len);
         
         req_waiting_packet = req_waiting_packet->next;
@@ -200,19 +205,30 @@ void send_packet_out_to_next_hop(struct sr_instance* sr,
 }
 
 
-/* send the arp reply back if incoming_packet_dest_ip == interface_ip. */
+/* 
+    if incoming_packet_dest_ip == interface_ip
+    (the target IP address is one of your router's IP addresses, they match!)
+        1. cache the entry
+        2. send the arp reply back
+*/
 void handle_arp_packet_request(struct sr_instance* sr, 
-                        sr_arp_hdr_t* packet_arp_header, 
-                        uint8_t * packet, 
-                        struct sr_if *receiving_interface) {
-
-    send_arp_reply(sr, packet_arp_header, packet, receiving_interface);
+                               sr_arp_hdr_t* packet_arp_header, 
+                               uint8_t * packet, 
+                               struct sr_if *connected_interface) {
+    
+    /*
+        1) Looks up this IP in the request queue. If it is found, returns a pointer
+           to the sr_arpreq with this IP. Otherwise, returns NULL.
+        2) Inserts this IP to MAC mapping in the cache, and marks it valid. 
+    */                                     
+    sr_arpcache_insert(&sr->cache, packet_arp_header->ar_sha, packet_arp_header->ar_sip);
+    send_arp_reply(sr, packet_arp_header, packet, connected_interface);
 }
 
 void send_arp_reply(struct sr_instance* sr, 
                     sr_arp_hdr_t* original_packet_arp_header, 
                     uint8_t * packet, 
-                    struct sr_if *receiving_interface) {
+                    struct sr_if *connected_interface) {
                       
     /* extract ethernet header from packet*/
     sr_ethernet_hdr_t* original_packet_eth_header = extract_eth_header(packet, 0);
@@ -227,13 +243,13 @@ void send_arp_reply(struct sr_instance* sr,
     sr_arp_hdr_t* new_arp_packet_arp_header = extract_arp_header(new_arp_packet, sizeof(sr_ethernet_hdr_t));
 
     /* build new ARP ethernet_header*/
-    build_new_arp_reply_packet_eth_header(new_arp_packet_eth_header, original_packet_eth_header, receiving_interface);
+    build_new_arp_reply_packet_eth_header(new_arp_packet_eth_header, original_packet_eth_header, connected_interface);
 
     /* build new ARP arp_header*/
-    build_new_arp_reply_packet_arp_header(new_arp_packet_arp_header, original_packet_arp_header, receiving_interface);
+    build_new_arp_reply_packet_arp_header(new_arp_packet_arp_header, original_packet_arp_header, connected_interface);
 
     /* send out this new ARP packet*/
-    sr_send_packet(sr, new_arp_packet, new_arp_packet_len, receiving_interface->name);
+    sr_send_packet(sr, new_arp_packet, new_arp_packet_len, connected_interface->name);
     free(new_arp_packet);
 }
 
