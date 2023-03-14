@@ -490,10 +490,10 @@ struct sr_rt * find_longest_prefix_match_in_routing_table(struct sr_instance* sr
     fprintf(stderr, "packet_ip_addr: ");   
     print_addr_ip_int(packet_ip_addr); 
     while(NULL != curr_routing_table_entry) {
-        fprintf(stderr, "curr_routing_table_entry->dest: ");   
-        print_addr_ip_int(curr_routing_table_entry->dest.s_addr); 
+        fprintf(stderr, "curr_routing_table_entry->gw: ");   
+        print_addr_ip_int(curr_routing_table_entry->gw.s_addr); 
         uint32_t packet_ip_addr_with_mask = packet_ip_addr & curr_routing_table_entry->mask.s_addr;
-        uint32_t curr_routing_table_entry_gw_with_mask = curr_routing_table_entry->dest.s_addr & curr_routing_table_entry->mask.s_addr;
+        uint32_t curr_routing_table_entry_gw_with_mask = curr_routing_table_entry->gw.s_addr & curr_routing_table_entry->mask.s_addr;
 
         if(packet_ip_addr_with_mask == curr_routing_table_entry_gw_with_mask && 
            longest_prefix <= curr_routing_table_entry->mask.s_addr) {
