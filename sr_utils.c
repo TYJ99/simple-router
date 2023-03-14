@@ -496,7 +496,7 @@ struct sr_rt * find_longest_prefix_match_in_routing_table(struct sr_instance* sr
         uint32_t curr_routing_table_entry_gw_with_mask = curr_routing_table_entry->dest.s_addr & curr_routing_table_entry->mask.s_addr;
 
         if(packet_ip_addr_with_mask == curr_routing_table_entry_gw_with_mask && 
-           longest_prefix < curr_routing_table_entry->mask.s_addr) {
+           longest_prefix <= curr_routing_table_entry->mask.s_addr) {
 
               fprintf(stderr, "longest prefix matched!\n");
               longest_prefix = curr_routing_table_entry->mask.s_addr;
