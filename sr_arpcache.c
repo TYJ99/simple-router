@@ -86,8 +86,14 @@ void handle_arp_request(struct sr_instance *sr, struct sr_arpreq *arp_request) {
                 /*struct sr_if *dest_interface = sr_get_interface(sr, req_waiting_packet->iface);*/
                 uint8_t *original_packet_raw_eth_frame = req_waiting_packet->buf;
                 sr_ip_hdr_t* original_packet_ip_header = extract_ip_header(original_packet_raw_eth_frame, sizeof(sr_ethernet_hdr_t));
-                struct sr_rt *next_hop = find_entry_in_routing_table(sr, original_packet_ip_header->ip_src);
-                struct sr_if* connected_interface = sr_get_interface(sr, next_hop->interface);
+                struct sr_rt *next_hop = NULL;
+                struct sr_if* connected_interface = NULL;
+                if(original_packet_ip_header->ip_dst == arp_request->ip) {
+                    next_hop = find_longest_prefix_match_in_routing_table(sr, original_packet_ip_header->ip_src);
+                }else {
+                    next_hop = find_longest_prefix_match_in_routing_table(sr, arp_request->ip);
+                }
+                connected_interface = sr_get_interface(sr, next_hop->interface);
                 fprintf(stderr, "send icmp host unreachable(type 3, code 1) to source addr(sender)\n");
                 send_icmp_with_type_code(sr, original_packet_raw_eth_frame, connected_interface, icmp_type, icmp_code);
                 req_waiting_packet = req_waiting_packet->next;
