@@ -465,6 +465,9 @@ void handle_ip_packet(struct sr_instance* sr,
                                                                  len, 
                                                                  next_hop->interface);
             fprintf(stderr, "entry exists, send an ARP request for the next-hop IP\n");
+            fprintf(stderr, "next_hop->interface: %d\n", next_hop->interface);
+            fprintf(stderr, "arp_request ip: ");
+            print_addr_ip_int(arp_request->ip);
             handle_arp_request(sr, arp_request);
         }
         return;
