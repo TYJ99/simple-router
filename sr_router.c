@@ -460,12 +460,12 @@ void handle_ip_packet(struct sr_instance* sr,
                 that corresponds to this ARP request.
             */
             struct sr_arpreq *arp_request = sr_arpcache_queuereq(&sr->cache, 
-                                                                 packet_ip_header->ip_dst, 
+                                                                 next_hop->gw.s_addr, 
                                                                  packet, 
                                                                  len, 
                                                                  next_hop->interface);
             fprintf(stderr, "entry exists, send an ARP request for the next-hop IP\n");
-            fprintf(stderr, "next_hop->interface: %d\n", next_hop->interface);
+            fprintf(stderr, "next_hop->interface: %s\n", next_hop->interface);
             fprintf(stderr, "arp_request ip: ");
             print_addr_ip_int(arp_request->ip);
             handle_arp_request(sr, arp_request);
