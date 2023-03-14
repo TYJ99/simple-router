@@ -370,7 +370,7 @@ void handle_ip_packet(struct sr_instance* sr,
                                      packet,
                                      connected_interface,
                                      icmp_type, 
-                                     icmp_code)
+                                     icmp_code);
         }
         
         return;

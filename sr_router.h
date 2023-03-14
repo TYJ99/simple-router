@@ -86,7 +86,7 @@ void handle_arp_packet_reply(struct sr_instance* sr,
                         sr_arp_hdr_t* packet_arp_reply_header, 
                         struct sr_if *outgoing_interface);
 
-send_packet_out_to_next_hop(struct sr_instance* sr, 
+void send_packet_out_to_next_hop(struct sr_instance* sr, 
                             uint8_t *destination_mac_addr,
                             uint8_t *packet_raw_eth_frame,
                             struct sr_if *outgoing_interface, 
