@@ -118,21 +118,22 @@ void handle_arp_packet(struct sr_instance* sr,
     }
     
     struct sr_if *connected_interface = sr_get_interface(sr, interface);
+    /*
+        When handling ARP requests, you should only send an ARP reply
+        if the target IP address is one of your router's IP addresses.
+    */
+
+    /* 
+        check if the arp target ip address match this interface ip address
+        if not, ignore this ARP packet.
+    */
+    if(connected_interface->ip != packet_arp_header->ar_tip) {
+        fprintf(stderr, "the arp target ip address does NOT match this interface ip address\n");
+        return;
+    }
+    
     unsigned short arp_op = ntohs(packet_arp_header->ar_op);
     if(arp_op_request == arp_op) {
-        /*
-            When handling ARP requests, you should only send an ARP reply
-            if the target IP address is one of your router's IP addresses.
-        */
-
-        /* 
-            check if the arp target ip address match this interface ip address
-            if not, ignore this ARP packet.
-        */
-        if(connected_interface->ip != packet_arp_header->ar_tip) {
-            fprintf(stderr, "the arp target ip address does NOT match this interface ip address\n");
-            return;
-        }
         fprintf(stderr, "handle_arp_packet_request\n");
         handle_arp_packet_request(sr, packet_arp_header, packet, connected_interface);
     }else if(arp_op_reply == arp_op) {
